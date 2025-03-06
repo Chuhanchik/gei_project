@@ -1,0 +1,45 @@
+import sys
+from io import BytesIO
+import requests
+from PIL import Image
+from map_utils import calculate_spn
+
+
+toponym_to_find = " ".join(sys.argv[1:])
+geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+geocoder_params = {
+    "apikey": "8013b162-6b42-4997-9691-77b7074026e0",
+    "geocode": toponym_to_find,
+    "format": "json"
+}
+
+response = requests.get(geocoder_api_server, params=geocoder_params)
+
+if not response:
+    print("Ошибка при выполнении запроса к геекодеру.")
+    sys.exit(1)
+
+json_response = response.json()
+toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+toponym_coordinates = toponym["Point"]["pos"]
+toponym_longitude, toponym_latitude = toponym_coordinates.split(" ")
+
+object_size = float(input("Введите размер объектав метрах: "))
+spn_x, spn_y = calculate_spn(object_size)
+
+map_params = {
+    "ll": ",".join([toponym_longitude, toponym_latitude]),
+    "spn": ",".join([str(spn_x), str(spn_y)]),
+    "l": "map",
+    "pt": f"{toponym_longitude},{toponym_latitude},pm2rdm"
+}
+
+map_api_server = "https://yandex.ru/maps"
+response = requests.get(map_api_server, params=map_params)
+
+if response.status_code == 200:
+    im = BytesIO(response.content)
+    opened_image = Image.open(im)
+    opened_image.show()
+else:
+    print("Ошибка при плучении карты:", response.status_code)
